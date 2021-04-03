@@ -93,4 +93,9 @@ def plot_smooth(region, type=None, time_window=21, smooth_window=7, save=False):
         plt.savefig(f'{type}_{region.denominazione_regione.iloc[0]}_tw={time_window}_sw={smooth_window}.png',
                     dpi=300, bbox_inches='tight', facecolor='white')
     plt.show()
-    
+
+def mad(arr):
+    """Median Absolute Deviation: a robust version of standard deviation"""
+    arr = np.ma.array(arr).compressed()     # a (compressed) masked array is a quick way to avoid NaNs
+    med = np.median(arr)
+    return np.median(np.abs(arr - med))
