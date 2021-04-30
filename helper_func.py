@@ -39,11 +39,12 @@ def data_by_region(region_name):
     regione = ts[ts['denominazione_regione'] == region_name.title()].drop(columns=['stato', 'codice_regione', 'lat', 'long'])
     regione['data'] = pd.to_datetime(regione.data).dt.strftime('%d-%m-%y')
 
-    # Add a column for daily fatalities
+    # Add columns for daily fatalities, swabs and positivity rate
     incremento_deceduti = np.diff(regione.deceduti)
     regione['incremento_deceduti'] = np.insert(incremento_deceduti, 1, 0)  # insert a 0 for the first day
-    incremento_tamponi = np.diff(regione.tamponi)
-    regione['incremento_tamponi'] = np.insert(incremento_tamponi, 1, 0)
+    incremento_tamponi_mol = np.diff(regione.tamponi_test_molecolare)
+    regione['incremento_tamponi_molecolari'] = np.insert(incremento_tamponi_mol, 1, 0)
+    regione['tasso_positività'] = regione['nuovi_positivi'] / regione['incremento_tamponi_molecolari']
 
     return regione
 
@@ -53,7 +54,7 @@ def plot_smooth(region, type=None, time_window=21, smooth_window=7, save=False):
 
     Keywords:
     region --> DataFrame, output from data_by_region()
-    type --> str; 'positivi' (new infections), 'deceduti' (deaths) or 'TI' (ICU admissions); None defaults to 'positivi'
+    type --> str; 'positivi' (new infections), 'deceduti' (deaths), 'TI' (ICU admissions) or 'positività' (positivity rate); defaults to 'positivi'
     time_window --> int, number of days to plot to date; default, 21 (3 weeks)
     smooth_window --> int, number of days used for smoothing; default, 7 (1 week)
     save --> bool, choose whether to save the displayed image; default, False
@@ -66,15 +67,21 @@ def plot_smooth(region, type=None, time_window=21, smooth_window=7, save=False):
         if region.denominazione_regione.iloc[0] == 'Campania':
             # November '20 (http://dati.istat.it/Index.aspx?DataSetCode=DCIS_POPORESBIL1)
             pop_campania = 5687845
-            # casi / 100mila abitanti (negli ultimi 7gg) -- la soglia per la zona rossa è 250
+            # cases / 100k people (over the past 7 days) -- the "red zone" threshold is 250
             incidenza = int(np.around(10 ** 5 * region[column].tail(7).sum() / pop_campania, 0))
             plt.plot([], [], ' ', label=f'{incidenza} casi / 100mila abitanti')
     elif type == 'deceduti':
         type, column = 'incremento deceduti', 'incremento_deceduti'
     elif type == 'TI':
         type, column = 'ingressi in TI', 'ingressi_terapia_intensiva'
+    elif type == 'positività':
+        type, column = 'tasso di positività', 'tasso_positività'
+        monthly_rolling_median = region.tasso_positività.rolling(30).median().values[-1].round(3)
+        weekly_rolling_median = region.tasso_positività.rolling(7).median().values[-1].round(3)
+        plt.plot([], [], ' ', label=f'rolling median (30 giorni): {100*monthly_rolling_median}%')
+        plt.plot([], [], ' ', label=f'rolling median (7 giorni): {100*weekly_rolling_median}%')
     else:
-        print('Mi spiace, non capisco; ricorda che le tipologie ammesse sono: positivi, deceduti e TI.')
+        print("I'm sorry, I don't understand; remember that the allowed types are: positivi, deceduti, TI and positività.")
 
     # Forward-backward EMA
     f_ema = region[column].ewm(span=smooth_window).mean()
@@ -82,10 +89,13 @@ def plot_smooth(region, type=None, time_window=21, smooth_window=7, save=False):
 
     # Plot
     plt.plot(region.data.tail(time_window), region[column].tail(time_window),
-             marker='o', ms=5, ls=':', lw=0.8, c='tab:red', label=type)
+             marker='o', ms=5, ls=':', lw=0.8, c='tab:red')
     plt.plot(region.data.tail(time_window), fb_ema.tail(time_window),
              lw=1.5, c='k', label=f'smoothing esponenziale ({smooth_window} giorni)')
-    plt.xticks(plt.xticks()[0][::3])  # make ticks less dense
+    tick_freq = int(round(time_window/10,0))
+    plt.xticks(plt.xticks()[0][::tick_freq])  # make ticks less dense
+    ylabel = [word.title() if len(word)>2 else word for word in type.split()]
+    plt.ylabel(f"{' '.join(ylabel)}")
     plt.legend(frameon=False)
     plt.title(f'Regione {region.denominazione_regione.iloc[0]} (ultimi {time_window} giorni)')
 
