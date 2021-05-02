@@ -76,10 +76,10 @@ def plot_smooth(region, type=None, time_window=21, smooth_window=7, save=False):
         type, column = 'ingressi in TI', 'ingressi_terapia_intensiva'
     elif type == 'positività':
         type, column = 'tasso di positività', 'tasso_positività'
-        monthly_rolling_median = region.tasso_positività.rolling(30).median().values[-1].round(3)
-        weekly_rolling_median = region.tasso_positività.rolling(7).median().values[-1].round(3)
-        plt.plot([], [], ' ', label=f'rolling median (30 giorni): {100*monthly_rolling_median}%')
-        plt.plot([], [], ' ', label=f'rolling median (7 giorni): {100*weekly_rolling_median}%')
+        monthly_rolling_median = region.tasso_positività.rolling(30).median().values[-1]
+        weekly_rolling_median = region.tasso_positività.rolling(7).median().values[-1]
+        plt.plot([], [], ' ', label=f'rolling median (30 giorni): {np.round(100*monthly_rolling_median,1)}%')
+        plt.plot([], [], ' ', label=f'rolling median (7 giorni): {np.round(100*weekly_rolling_median,1)}%')
     else:
         print("I'm sorry, I don't understand; remember that the allowed types are: positivi, deceduti, TI and positività.")
 
